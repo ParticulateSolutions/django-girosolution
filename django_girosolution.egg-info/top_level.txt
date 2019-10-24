@@ -1,1 +1,2 @@
 django_girosolution
+django_girosolution/migrations

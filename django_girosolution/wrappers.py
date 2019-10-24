@@ -84,7 +84,8 @@ class GirosolutionWrapper(object):
         redirect_url=GIROSOLUTION_RETURN_URL,
         notify_url=GIROSOLUTION_NOTIFICATION_URL,
         success_url=GIROSOLUTION_SUCCESS_URL,
-        error_url=GIROSOLUTION_ERROR_URL):
+        error_url=GIROSOLUTION_ERROR_URL,
+        shipping_address=None):
         """
         girosolution transaction
         :param merchant_tx_id:
@@ -115,6 +116,36 @@ class GirosolutionWrapper(object):
         #
         #
         # todo: add datamapping for other paymentmethods
+
+        elif self.payment_type is GIROSOLUTION_PAYMENT_METHODS.GP:
+            # go with giropay
+            data = OrderedDict()
+            data['merchantId'] = self.payment.get('MERCHANT_ID')
+            data['projectId'] = self.payment.get('PROJECT_ID')
+            data['merchantTxId'] = merchant_tx_id
+            data['amount'] = amount
+            data['currency'] = currency
+            data['purpose'] = purpose
+            data['urlRedirect'] = redirect_url
+            data['urlNotify'] = notify_url
+
+        elif self.payment_type is GIROSOLUTION_PAYMENT_METHODS.PD:
+            # go with paydirekt
+            data = OrderedDict()
+            data['merchantId'] = self.payment.get('MERCHANT_ID')
+            data['projectId'] = self.payment.get('PROJECT_ID')
+            data['merchantTxId'] = merchant_tx_id
+            data['amount'] = amount
+            data['currency'] = currency
+            data['purpose'] = purpose
+            data['shippingAddresseFirstName'] = shipping_address['shippingAddresseFirstName']
+            data['shippingAddresseLastName'] = shipping_address['shippingAddresseLastName']
+            data['shippingZipCode'] = shipping_address['shippingZipCode']
+            data['shippingCity'] = shipping_address['shippingCity']
+            data['shippingCountry'] = 'DE'
+            data['orderId'] = merchant_tx_id
+            data['urlRedirect'] = redirect_url
+            data['urlNotify'] = notify_url
 
         else:
             logger.error(_("unknown payment method"))
@@ -172,6 +203,9 @@ class GirosolutionWrapper(object):
 
         generated_hash = self._generate_hash_from_dict(data)
         data.update({'hash': generated_hash})
+
+        from pprint import pprint
+        pprint(data)
 
         try:
             response = requests.post(url, data=data)

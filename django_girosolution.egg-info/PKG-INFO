@@ -1,6 +1,6 @@
 Metadata-Version: 1.1
 Name: django-girosolution
-Version: 0.1.0
+Version: 0.1.1
 Summary: Django integration of girosolution
 Home-page: https://github.com/ParticulateSolutions/django-girosolution
 Author: Particulate Solutions GmbH
