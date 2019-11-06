@@ -2,6 +2,7 @@ import requests
 from django_girosolution.settings import *
 from collections import OrderedDict
 import logging
+from django.utils.translation import gettext_lazy as _, ugettext
 
 logger = logging.getLogger(__name__)
 
@@ -99,9 +100,9 @@ class GirosolutionWrapper(object):
         :return: response dict from girocheckout
         """
 
+
         # check type to start
         if self.payment_type is GIROSOLUTION_PAYMENT_METHODS.CC:
-
             # go with creditcard
             data = OrderedDict()
             data['merchantId'] = self.payment.get('MERCHANT_ID')
@@ -113,12 +114,20 @@ class GirosolutionWrapper(object):
             data['urlRedirect'] = redirect_url
             data['urlNotify'] = notify_url
 
-        #
-        #
-        # todo: add datamapping for other paymentmethods
-
         elif self.payment_type is GIROSOLUTION_PAYMENT_METHODS.GP:
             # go with giropay
+            data = OrderedDict()
+            data['merchantId'] = self.payment.get('MERCHANT_ID')
+            data['projectId'] = self.payment.get('PROJECT_ID')
+            data['merchantTxId'] = merchant_tx_id
+            data['amount'] = amount
+            data['currency'] = currency
+            data['purpose'] = purpose
+            data['urlRedirect'] = redirect_url
+            data['urlNotify'] = notify_url
+
+        elif self.payment_type is GIROSOLUTION_PAYMENT_METHODS.PP:
+            # go with paypal
             data = OrderedDict()
             data['merchantId'] = self.payment.get('MERCHANT_ID')
             data['projectId'] = self.payment.get('PROJECT_ID')
@@ -142,13 +151,14 @@ class GirosolutionWrapper(object):
             data['shippingAddresseLastName'] = shipping_address['shippingAddresseLastName']
             data['shippingZipCode'] = shipping_address['shippingZipCode']
             data['shippingCity'] = shipping_address['shippingCity']
-            data['shippingCountry'] = 'DE'
+            data['shippingCountry'] = shipping_address['shippingCountry']
             data['orderId'] = merchant_tx_id
             data['urlRedirect'] = redirect_url
             data['urlNotify'] = notify_url
 
         else:
             logger.error(_("unknown payment method"))
+            raise Exception(_("unknown payment method"))
 
 
         # make api call with given data
@@ -164,7 +174,6 @@ class GirosolutionWrapper(object):
             logger.error(_("Response hash {} not compatible with the generated hash {}.").format(response_hash,
                                                                                                  generated_hash))
 
-        # todo: errorhandling
         if response_dict.get('reference'):
             # generate transaction object
             from django_girosolution.models import GirosolutionTransaction
@@ -184,8 +193,8 @@ class GirosolutionWrapper(object):
             g_tx.payment_type = self.payment_type
             g_tx.save()
         else:
+            logger.error(_("no reference given by response"))
             return None
-
         return response_dict
 
     def call_api(self, url=None, data=None):
@@ -203,9 +212,6 @@ class GirosolutionWrapper(object):
 
         generated_hash = self._generate_hash_from_dict(data)
         data.update({'hash': generated_hash})
-
-        from pprint import pprint
-        pprint(data)
 
         try:
             response = requests.post(url, data=data)
