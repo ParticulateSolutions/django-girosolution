@@ -1,6 +1,6 @@
 MANIFEST.in
+README.md
 setup.py
-django_girosolution/.DS_Store
 django_girosolution/LICENSE
 django_girosolution/__init__.py
 django_girosolution/admin.py

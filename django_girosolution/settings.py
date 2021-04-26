@@ -16,7 +16,9 @@ class GIROSOLUTION_PAYMENT_METHODS:
 
 GIROSOLUTION_VALID_TRANSACTION_STATUSES = [4000]
 
-GIROSOLUTION_API_URL = 'https://payment.girosolution.de/girocheckout/api/v2/transaction/start'
+GIROSOLUTION_API_BASE_URL = 'https://payment.girosolution.de/girocheckout/api/v2/'
+GIROSOLUTION_API_URL = GIROSOLUTION_API_BASE_URL + 'transaction/start'
+GIROSOLUTION_API_STATUS_URL = GIROSOLUTION_API_BASE_URL + 'transaction/status'
 
 # checkout urls
 GIROSOLUTION_RETURN_URL = getattr(settings, 'GIROSOLUTION_RETURN_URL', '/girosolution/return/')

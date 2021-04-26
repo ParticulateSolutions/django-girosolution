@@ -44,6 +44,18 @@ class GirosolutionTransaction(models.Model):
     def __str__(self):
         return self.merchant_tx_id
 
+    @property
+    def valid_payment(self) -> bool:
+        return self.result_payment in GIROSOLUTION_VALID_TRANSACTION_STATUSES
+
+    def refresh_from_girosolution(self, girosolution_wrapper) -> bool:
+        """
+
+        :param girosolution_wrapper: GiroSolutionWrapper
+        :return: bool; True if state is successfully updated
+        """
+        return girosolution_wrapper.update_transaction_state(self)
+
     class Meta:
         verbose_name = _("Girosolution Transaction")
-        verbose_name_plural = _("Girosolution Transaction")
+        verbose_name_plural = _("Girosolution Transactions")

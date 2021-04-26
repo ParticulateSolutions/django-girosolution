@@ -101,6 +101,6 @@ class GirosolutionReturnView(RedirectView):
         girosolution_transaction.backend_tx_id = get_params['gcBackendTxId']
         girosolution_transaction.save()
 
-        if girosolution_transaction.result_payment not in django_girosolution_settings.GIROSOLUTION_VALID_TRANSACTION_STATUSES:
+        if not girosolution_transaction.valid_payment:
             return self.get_cancel_url(girosolution_transaction)
         return self.get_success_url(girosolution_transaction)
