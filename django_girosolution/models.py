@@ -5,6 +5,7 @@ import logging
 from django.db import models
 from django.utils.encoding import python_2_unicode_compatible
 from django.utils.translation import ugettext_lazy as _
+from django_girosolution import settings as django_girosolution_settings
 
 
 @python_2_unicode_compatible
@@ -46,7 +47,7 @@ class GirosolutionTransaction(models.Model):
 
     @property
     def valid_payment(self) -> bool:
-        return self.result_payment in GIROSOLUTION_VALID_TRANSACTION_STATUSES
+        return self.result_payment in django_girosolution_settings.GIROSOLUTION_VALID_TRANSACTION_STATUSES
 
     def refresh_from_girosolution(self, girosolution_wrapper) -> bool:
         """
