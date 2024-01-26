@@ -3,6 +3,7 @@ import requests
 from collections import OrderedDict
 from django.utils.translation import gettext_lazy as _, ugettext
 
+from django_girosolution.constants import SHOPPING_CART_TYPE
 from django_girosolution.settings import *
 
 logger = logging.getLogger(__name__)
@@ -77,9 +78,12 @@ class GirosolutionWrapper(object):
                           notify_url=GIROSOLUTION_NOTIFICATION_URL,
                           success_url=GIROSOLUTION_SUCCESS_URL,
                           error_url=GIROSOLUTION_ERROR_URL,
-                          shipping_address=None):
+                          shipping_address=None,
+                          shoppingCartType=SHOPPING_CART_TYPE.ANONYMOUS_DONATION,
+                          merchantOrderReferenceNumber=False,
+                          kassenzeichen=False):
         """
-        girosolution transaction
+        girosolution transaction. The data needs to be ordered like in the API docs, otherwise the hash will be invalid.
         :param merchant_tx_id:
         :param amount:
         :param purpose:
@@ -88,6 +92,10 @@ class GirosolutionWrapper(object):
         :param notify_url:
         :param success_url:
         :param error_url:
+        :param shipping_address: None or dict that contains all fields that start with "shipping". Content depends on shoppingCartType.
+        :param shoppingCartType: For Giropay. Default "ANONYMOUS_DONATION" because it requires no shipping_address. Other values require other shipping_address fields. See their docs.
+        :param merchantOrderReferenceNumber: For Giropay. str with max len 20
+        :param kassenzeichen: For Giropay. str with max len 255. Should be visible in girocockpit and will be in export.
         :return: response dict from girocheckout
         """
 
@@ -113,8 +121,24 @@ class GirosolutionWrapper(object):
             data['amount'] = amount
             data['currency'] = currency
             data['purpose'] = purpose
+            data['shoppingCartType'] = shoppingCartType
+            if shipping_address:
+                data['shippingAddresseFirstName'] = shipping_address.get('shippingAddresseFirstName', '')
+                data['shippingAddresseLastName'] = shipping_address.get('shippingAddresseLastName', '')
+                data['shippingCompany'] = shipping_address.get('shippingCompany', '')
+                data['shippingAdditionalAddressInformation'] = shipping_address.get('shippingAdditionalAddressInformation', '')
+                data['shippingStreet'] = shipping_address.get('shippingStreet', '')
+                data['shippingStreetNumber'] = shipping_address.get('shippingStreetNumber', '')
+                data['shippingZipCode'] = shipping_address.get('shippingZipCode', '')
+                data['shippingCity'] = shipping_address.get('shippingCity', '')
+                data['shippingCountry'] = shipping_address.get('shippingCountry', '')
+                data['shippingEmail'] = shipping_address.get('shippingEmail', '')
+            if merchantOrderReferenceNumber:
+                data['merchantOrderReferenceNumber'] = merchantOrderReferenceNumber
             data['urlRedirect'] = redirect_url
             data['urlNotify'] = notify_url
+            if kassenzeichen:
+                data['kassenzeichen'] = kassenzeichen
 
         elif self.payment_type is GIROSOLUTION_PAYMENT_METHODS.PP:
             # go with paypal
