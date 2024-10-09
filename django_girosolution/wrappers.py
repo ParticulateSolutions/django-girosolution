@@ -1,7 +1,7 @@
 import logging
 import requests
 from collections import OrderedDict
-from django.utils.translation import gettext_lazy as _, ugettext
+from django.utils.translation import gettext_lazy as _
 
 from django_girosolution.constants import SHOPPING_CART_TYPE
 from django_girosolution.settings import *
