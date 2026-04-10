@@ -40,3 +40,20 @@ class SHOPPING_CART_TYPE:
     MIXED = 'MIXED'
     ANONYMOUS_DONATION = 'ANONYMOUS_DONATION'
     AUTHORITIES_PAYMENT = 'AUTHORITIES_PAYMENT'
+
+
+PAYPAGE_PAYMENT_METHODS = {
+    2: _("eps"),
+    6: _("Direct debit"),
+    7: _("Direct debit with lock file"),
+    11: _("Credit card"),
+    12: _("iDEAL"),
+    14: _("PayPal"),
+    26: _("Bluecode"),
+    33: _("Maestro"),
+    36: _("Apple Pay"),
+    37: _("Direktueberweisung"),
+    38: _("Klarna"),
+    39: _("Google Pay"),
+    40: _("WERO"),
+}

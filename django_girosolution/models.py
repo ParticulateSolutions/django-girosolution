@@ -22,6 +22,8 @@ class GirosolutionTransaction(models.Model):
     success_url = models.TextField(_("success url"))
     error_url = models.TextField(_("error url"))
 
+    paypage_url = models.TextField(_("paypage url"), null=True, blank=True)
+
     payment_type = models.CharField(_("paymentname"), max_length=128)
 
     result_payment = models.IntegerField(_("return code from girosolution transaction"), null=True)

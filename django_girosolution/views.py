@@ -1,7 +1,7 @@
 import logging
 from collections import OrderedDict
 
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseRedirect
 from django.utils.translation import gettext_lazy as _
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import View, RedirectView
@@ -68,6 +68,96 @@ class NotifyGirosolutionView(View):
             )
             return HttpResponse(status=400)
         return HttpResponse(status=200)
+
+
+class NotifyPaypageView(View):
+    """
+    Handles server-to-server notifications from GiroCheckout Payment Page.
+    The paypage notification is sent as GET with gc* parameters including
+    gcPaymethod and gcType in addition to the standard parameters.
+    Override handle_updated_transaction() for custom logic.
+    """
+    girosolution_wrapper = GirosolutionWrapper()
+
+    def get(self, request, *args, **kwargs):
+        get_params = OrderedDict()
+        for query_param in request.META['QUERY_STRING'].split('&'):
+            get_params[query_param.split('=')[0]] = "=".join(query_param.split('=')[1:])
+
+        if not validate_girosolution_get_params(self.girosolution_wrapper, get_params):
+            return HttpResponse(status=400)
+
+        try:
+            girosolution_transaction = GirosolutionTransaction.objects.get(reference=get_params['gcReference'])
+        except GirosolutionTransaction.DoesNotExist:
+            return HttpResponse(status=400)
+
+        girosolution_transaction.result_payment = int(get_params['gcResultPayment'])
+        girosolution_transaction.backend_tx_id = get_params['gcBackendTxId']
+        girosolution_transaction.save()
+
+        return self.handle_updated_transaction(girosolution_transaction=girosolution_transaction)
+
+    @csrf_exempt
+    def dispatch(self, request, *args, **kwargs):
+        return super(NotifyPaypageView, self).dispatch(request, *args, **kwargs)
+
+    def handle_updated_transaction(self, girosolution_transaction, expected_statuses=django_girosolution_settings.GIROSOLUTION_VALID_TRANSACTION_STATUSES):
+        """
+        Override to use the girosolution_transaction in the way you want.
+        """
+        if girosolution_transaction.result_payment not in expected_statuses:
+            logger.error(
+                _("Girosolution Paypage Result faulty: {}").format(RESULT_PAYMENT_STATUS[girosolution_transaction.result_payment] if girosolution_transaction.result_payment in RESULT_PAYMENT_STATUS else girosolution_transaction.result_payment)
+            )
+            return HttpResponse(status=400)
+        return HttpResponse(status=200)
+
+
+class PaypageReturnView(RedirectView):
+    """
+    Handles the redirect back from GiroCheckout Payment Page.
+    The paypage sends results via POST to successUrl/failUrl.
+    """
+    girosolution_wrapper = GirosolutionWrapper()
+
+    def get_error_url(self):
+        return django_girosolution_settings.GIROSOLUTION_ERROR_URL
+
+    def get_cancel_url(self, girosolution_transaction):
+        return girosolution_transaction.error_url
+
+    def get_success_url(self, girosolution_transaction):
+        return girosolution_transaction.success_url
+
+    def post(self, request, *args, **kwargs):
+        post_params = request.POST.dict()
+
+        desired_variables = ['gcReference', 'gcMerchantTxId', 'gcBackendTxId',
+                             'gcAmount', 'gcCurrency', 'gcResultPayment', 'gcHash']
+        if not all([var in post_params for var in desired_variables]):
+            logger.error(
+                _("Not all desired variables where part of the Paypage return. Payload: {}").format(str(post_params))
+            )
+            return HttpResponseRedirect(self.get_error_url())
+
+        try:
+            girosolution_transaction = GirosolutionTransaction.objects.get(reference=post_params['gcReference'])
+        except GirosolutionTransaction.DoesNotExist:
+            logger.error('girosolution paypage transaction does not exist')
+            return HttpResponseRedirect(self.get_error_url())
+
+        girosolution_transaction.result_payment = int(post_params['gcResultPayment'])
+        girosolution_transaction.backend_tx_id = post_params['gcBackendTxId']
+        girosolution_transaction.save()
+
+        if not girosolution_transaction.valid_payment:
+            return HttpResponseRedirect(self.get_cancel_url(girosolution_transaction))
+        return HttpResponseRedirect(self.get_success_url(girosolution_transaction))
+
+    @csrf_exempt
+    def dispatch(self, request, *args, **kwargs):
+        return super(PaypageReturnView, self).dispatch(request, *args, **kwargs)
 
 
 class GirosolutionReturnView(RedirectView):
