@@ -13,7 +13,8 @@ class GirosolutionWrapper(object):
     """
     girosolution girocheckout integration
     """
-    interface_version = 'django_girosolution_v{}'.format(DJANGO_GIROSOLUTION_VERSION)
+
+    interface_version = f'django_girosolution_v{DJANGO_GIROSOLUTION_VERSION}'
 
     api_url = None
     transaction_start_url = None
@@ -40,13 +41,16 @@ class GirosolutionWrapper(object):
         except:
             pass
 
-    def _get_hash_for_payload(self, payload):
+    def validate_hash(self, data_dict, given_hash):
         """
-        generates hash for girosolution requests
-        :param payload:
-        :return: string
+        validates hash for api call
+        :param data_dict:
+        :param given_hash:
+        :return: bool
         """
-        return ''.join(map(str, [value for value in payload.values()]))
+        data_string = ''.join(str(v) for k, v in data_dict.items() if k != 'gcHash')
+        generated_hash = self._generate_hash_from_text(data_string)
+        return generated_hash == given_hash
 
     def _generate_hash_from_dict(self, data_dict):
         """
@@ -56,9 +60,13 @@ class GirosolutionWrapper(object):
         """
         import hashlib
         import hmac
-        data_string = "".join([str(val) for val in data_dict.values()])
-        data_hash = hmac.new(self.payment['PROJECT_PASSWORD'], "{}".format(data_string).encode("utf-8"),
-                             hashlib.md5).hexdigest()
+
+        data_string = ''.join([str(val) for val in data_dict.values()])
+        data_hash = hmac.new(
+            self.payment['PROJECT_PASSWORD'],
+            f'{data_string}'.encode('utf-8'),
+            hashlib.md5,
+        ).hexdigest()
         return data_hash
 
     def _generate_hash_from_text(self, data_text):
@@ -69,19 +77,25 @@ class GirosolutionWrapper(object):
         """
         import hashlib
         import hmac
-        data_hash = hmac.new(self.payment['PROJECT_PASSWORD'], data_text.encode("utf-8"), hashlib.md5).hexdigest()
+
+        data_hash = hmac.new(self.payment['PROJECT_PASSWORD'], data_text.encode('utf-8'), hashlib.md5).hexdigest()
         return data_hash
 
-    def start_transaction(self, merchant_tx_id, amount, purpose,
-                          currency='EUR',
-                          redirect_url=GIROSOLUTION_RETURN_URL,
-                          notify_url=GIROSOLUTION_NOTIFICATION_URL,
-                          success_url=GIROSOLUTION_SUCCESS_URL,
-                          error_url=GIROSOLUTION_ERROR_URL,
-                          shipping_address=None,
-                          shoppingCartType=SHOPPING_CART_TYPE.ANONYMOUS_DONATION,
-                          merchantOrderReferenceNumber=False,
-                          kassenzeichen=False):
+    def start_transaction(
+        self,
+        merchant_tx_id,
+        amount,
+        purpose,
+        currency='EUR',
+        redirect_url=GIROSOLUTION_RETURN_URL,
+        notify_url=GIROSOLUTION_NOTIFICATION_URL,
+        success_url=GIROSOLUTION_SUCCESS_URL,
+        error_url=GIROSOLUTION_ERROR_URL,
+        shipping_address=None,
+        shoppingCartType=SHOPPING_CART_TYPE.ANONYMOUS_DONATION,
+        merchantOrderReferenceNumber=False,
+        kassenzeichen=False,
+    ):
         """
         girosolution transaction. The data needs to be ordered like in the API docs, otherwise the hash will be invalid.
         :param merchant_tx_id:
@@ -171,18 +185,18 @@ class GirosolutionWrapper(object):
             data['urlNotify'] = notify_url
         elif self.payment_type is GIROSOLUTION_PAYMENT_METHODS.WERO:
             data = OrderedDict()
-            data["merchantId"] = self.payment.get("MERCHANT_ID")
-            data["projectId"] = self.payment.get("PROJECT_ID")
-            data["merchantTxId"] = merchant_tx_id
-            data["amount"] = amount
-            data["currency"] = currency
-            data["purpose"] = purpose
-            data["urlRedirect"] = redirect_url
-            data["urlNotify"] = notify_url
+            data['merchantId'] = self.payment.get('MERCHANT_ID')
+            data['projectId'] = self.payment.get('PROJECT_ID')
+            data['merchantTxId'] = merchant_tx_id
+            data['amount'] = amount
+            data['currency'] = currency
+            data['purpose'] = purpose
+            data['urlRedirect'] = redirect_url
+            data['urlNotify'] = notify_url
             if kassenzeichen:
                 data['kassenzeichen'] = kassenzeichen
         else:
-            raise Exception(_("unknown payment method"))
+            raise Exception(_('unknown payment method'))
 
         # make api call with given data
         response = self.call_api(url=GIROSOLUTION_API_URL, data=data)
@@ -193,11 +207,12 @@ class GirosolutionWrapper(object):
 
         generated_hash = self._generate_hash_from_text(response_text)
         # check if hash is valid
-        assert response_hash == generated_hash, _("Response hash {} not compatible with the generated hash {}.").format(response_hash, generated_hash)
+        assert response_hash == generated_hash, _(f'Response hash {response_hash} not compatible with the generated hash {generated_hash}.')
 
         if response_dict.get('reference'):
             # generate transaction object
             from django_girosolution.models import GirosolutionTransaction
+
             g_tx = GirosolutionTransaction()
             g_tx.redirect_url = redirect_url
             g_tx.notify_url = notify_url
@@ -214,7 +229,7 @@ class GirosolutionWrapper(object):
             g_tx.payment_type = self.payment_type
             g_tx.save()
         else:
-            logger.error(_("no reference given by response"))
+            logger.error(_('no reference given by response'))
             return None
         return response_dict
 
@@ -235,13 +250,18 @@ class GirosolutionWrapper(object):
 
         generated_hash = self._generate_hash_from_text(response_text)
         # check if hash is valid
-        assert response_hash == generated_hash, _("Response hash {} not compatible with the generated hash {}.").format(response_hash, generated_hash)
+        assert response_hash == generated_hash, _(f'Response hash {response_hash} not compatible with the generated hash {generated_hash}.')
 
-        update_fields = ["latest_response_code", "latest_response_msg"]
+        update_fields = ['latest_response_code', 'latest_response_msg']
         girosolution_transaction.latest_response_code = response_dict.get('rc')
         girosolution_transaction.latest_response_msg = response_dict.get('msg')
         if response_dict.get('rc') == 0:
-            update_fields += ["backend_tx_id", "result_payment", "result_avs", "obv_name",]
+            update_fields += [
+                'backend_tx_id',
+                'result_payment',
+                'result_avs',
+                'obv_name',
+            ]
             girosolution_transaction.backend_tx_id = response_dict.get('backendTxId', None)
             girosolution_transaction.result_payment = int(response_dict.get('resultPayment', None))
             girosolution_transaction.result_avs = int(response_dict.get('resultAVS', None))
@@ -258,9 +278,7 @@ class GirosolutionWrapper(object):
         """
         from django.core.cache import cache
 
-        cache_key = 'girosolution_paypage_projects_{}_{}'.format(
-            self.payment['MERCHANT_ID'], self.payment['PROJECT_ID']
-        )
+        cache_key = f'girosolution_paypage_projects_{self.payment["MERCHANT_ID"]}_{self.payment["PROJECT_ID"]}'
         cached = cache.get(cache_key)
         if cached is not None:
             return cached
@@ -276,69 +294,70 @@ class GirosolutionWrapper(object):
         response_hash = response.headers.get('hash')
         response_text = response.text
         generated_hash = self._generate_hash_from_text(response_text)
-        assert response_hash == generated_hash, _(
-            "Response hash {} not compatible with the generated hash {}.").format(response_hash, generated_hash)
+        assert response_hash == generated_hash, _(f'Response hash {response_hash} not compatible with the generated hash {generated_hash}.')
 
         response_dict = response.json()
         if response_dict.get('rc') != 0:
-            logger.error(_("Paypage projects request failed: {}").format(response_dict.get('msg')))
+            logger.error(_(f'Paypage projects request failed: {response_dict.get("msg")}'))
             return None
 
         projects = response_dict.get('projects', [])
         cache.set(cache_key, projects, GIROSOLUTION_PAYPAGE_PROJECTS_CACHE_TIMEOUT)
         return projects
 
-    def init_paypage(self,
-                     merchant_tx_id,
-                     amount,
-                     purpose,
-                     currency='EUR',
-                     test=0,
-                     success_url=GIROSOLUTION_PAYPAGE_SUCCESS_URL,
-                     fail_url=GIROSOLUTION_PAYPAGE_FAIL_URL,
-                     back_url=GIROSOLUTION_PAYPAGE_BACK_URL,
-                     notify_url=GIROSOLUTION_PAYPAGE_NOTIFY_URL,
-                     error_url=GIROSOLUTION_ERROR_URL,
-                     pagetype=None,
-                     locale=None,
-                     description=None,
-                     paymethods=None,
-                     payprojects=None,
-                     transaction_type=None,
-                     single=None,
-                     timeout=None,
-                     expirydate=None,
-                     organization=None,
-                     freeamount=None,
-                     fixedvalues=None,
-                     minamount=None,
-                     maxamount=None,
-                     projectlist=None,
-                     pkn=None,
-                     certdata=None,
-                     otherpayments=None,
-                     kassenzeichen=None,
-                     qrcodeReturn=None,
-                     informationText=None,
-                     tds2Address=None,
-                     tds2Postcode=None,
-                     tds2City=None,
-                     tds2Country=None,
-                     tds2Optional=None,
-                     mandateReference=None,
-                     mandateSignedOn=None,
-                     mandateReceiverName=None,
-                     mandateSequence=None,
-                     billingAddress=None,
-                     shippingAddress=None,
-                     customerInfo=None,
-                     basket=None):
+    def init_paypage(
+        self,
+        merchant_tx_id,
+        amount,
+        purpose,
+        currency='EUR',
+        test=0,
+        success_url=GIROSOLUTION_PAYPAGE_SUCCESS_URL,
+        fail_url=GIROSOLUTION_PAYPAGE_FAIL_URL,
+        back_url=GIROSOLUTION_PAYPAGE_BACK_URL,
+        notify_url=GIROSOLUTION_PAYPAGE_NOTIFY_URL,
+        error_url=GIROSOLUTION_ERROR_URL,
+        pagetype=None,
+        locale=None,
+        description=None,
+        paymethods=None,
+        payprojects=None,
+        transaction_type=None,
+        single=None,
+        timeout=None,
+        expirydate=None,
+        organization=None,
+        freeamount=None,
+        fixedvalues=None,
+        minamount=None,
+        maxamount=None,
+        projectlist=None,
+        pkn=None,
+        certdata=None,
+        otherpayments=None,
+        kassenzeichen=None,
+        qrcodeReturn=None,
+        informationText=None,
+        tds2Address=None,
+        tds2Postcode=None,
+        tds2City=None,
+        tds2Country=None,
+        tds2Optional=None,
+        mandateReference=None,
+        mandateSignedOn=None,
+        mandateReceiverName=None,
+        mandateSequence=None,
+        billingAddress=None,
+        shippingAddress=None,
+        customerInfo=None,
+        basket=None,
+    ):
         """
         Initialize a GiroCheckout Payment Page.
         Field order in the OrderedDict matters for hash computation.
         :param merchant_tx_id: unique transaction id
         :param amount: amount in cents
-        :param purpose: purpose text (max 50 chars)
+        :param purpose: purpose text (max 27 chars) Some methods only allow 27 and not shortening it may cause errors
         :param currency: ISO 4217 currency code
         :param test: 1 for test mode, 0 for live
         :param success_url: redirect URL on successful payment
@@ -389,7 +408,7 @@ class GirosolutionWrapper(object):
         data['merchantTxId'] = merchant_tx_id
         data['amount'] = amount
         data['currency'] = currency
-        data['purpose'] = purpose
+        data['purpose'] = purpose[:27]
         if description is not None:
             data['description'] = description
         if pagetype is not None:
@@ -471,11 +490,11 @@ class GirosolutionWrapper(object):
         response_text = response.text
 
         generated_hash = self._generate_hash_from_text(response_text)
-        assert response_hash == generated_hash, _(
-            "Response hash {} not compatible with the generated hash {}.").format(response_hash, generated_hash)
+        assert response_hash == generated_hash, _(f'Response hash {response_hash} not compatible with the generated hash {generated_hash}.')
 
         if response_dict.get('reference'):
             from django_girosolution.models import GirosolutionTransaction
+
             g_tx = GirosolutionTransaction()
             g_tx.redirect_url = ''
             g_tx.notify_url = notify_url
@@ -489,11 +508,11 @@ class GirosolutionWrapper(object):
             g_tx.latest_response_code = response_dict.get('rc')
             g_tx.purpose = purpose[:27]
             g_tx.reference = response_dict.get('reference')
-            g_tx.payment_type = 'PAYPAGE'
+            g_tx.payment_type = GIROSOLUTION_PAYMENT_METHODS.PAYMENT_PAGE
             g_tx.paypage_url = response_dict.get('url')
             g_tx.save()
         else:
-            logger.error(_("no reference given by response"))
+            logger.error(_('no reference given by response'))
             return None
         return response_dict
 
@@ -508,7 +527,7 @@ class GirosolutionWrapper(object):
         if not self.payment:
             return False
         if not url.lower().startswith('http'):
-            url = '{0}{1}'.format(self.api_url, url)
+            url = f'{self.api_url}{url}'
 
         generated_hash = self._generate_hash_from_dict(data)
         data.update({'hash': generated_hash})
@@ -517,10 +536,9 @@ class GirosolutionWrapper(object):
             response = requests.post(url, data=data)
         except requests.HTTPError as e:
             if hasattr(e, 'errno'):
-                logger.error("Girosolution Error {0}({1})".format(e.errno, e.strerror))
+                logger.error(f'Girosolution Error {e.errno}({e.strerror})')
             else:
-                logger.error(
-                    "Girosolution Error({0})".format(e.strerror))
+                logger.error(f'Girosolution Error({e.strerror})')
         else:
             try:
                 response_dict = response.json()
@@ -530,6 +548,6 @@ class GirosolutionWrapper(object):
             except ValueError as ex:
                 logger.error(f'Girosolution API ValueError: {ex}')
             if not response.ok:
-                logger.error(f'Girosolution API error {response.code}: {response.text}')
+                logger.error(f'Girosolution API error {response.status_code}: {response.text}')
             return response
         return False

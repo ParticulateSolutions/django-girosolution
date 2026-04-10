@@ -17,14 +17,33 @@ from django_girosolution import settings as django_girosolution_settings
 logger = logging.getLogger(__name__)
 
 
-def validate_girosolution_get_params(girosolution_wrapper, get_params):
-    desired_variables = ['gcReference', 'gcMerchantTxId', 'gcBackendTxId', 'gcAmount', 'gcCurrency', 'gcResultPayment', 'gcHash']
+def parse_query_string(query_string):
+    """Parse a query string into an OrderedDict, preserving parameter order for hash verification."""
+    params = OrderedDict()
+    for query_param in query_string.split('&'):
+        key, _, value = query_param.partition('=')
+        params[key] = value
+    return params
+
+
+def validate_girosolution_params(girosolution_wrapper: GirosolutionWrapper, params):
+    desired_variables = [
+        'gcReference',
+        'gcMerchantTxId',
+        'gcBackendTxId',
+        'gcAmount',
+        'gcCurrency',
+        'gcResultPayment',
+        'gcHash',
+    ]
 
     # check for expected parameters
-    if not all([var in get_params for var in desired_variables]):
-        logger.error(
-            _("Not all desired variables where part of the GiroSolution Notification. Payload: {}").format(str(get_params))
-        )
+    if not all([var in params for var in desired_variables]):
+        logger.error(_(f'Not all desired variables were part of the GiroSolution Notification. Payload: {params}'))
+        return False
+
+    if not girosolution_wrapper.validate_hash(params, params['gcHash']):
+        logger.error(_('GiroSolution hash validation failed'))
         return False
 
     return True
@@ -34,13 +53,9 @@ class NotifyGirosolutionView(View):
     girosolution_wrapper = GirosolutionWrapper()
 
     def get(self, request, *args, **kwargs):
+        get_params = parse_query_string(request.META['QUERY_STRING'])
 
-        get_params = OrderedDict()
-        # creating OrderedDict out of query string, because we need it ordered for the hash check
-        for query_param in request.META['QUERY_STRING'].split('&'):
-            get_params[query_param.split('=')[0]] = "=".join(query_param.split('=')[1:])
-
-        if not validate_girosolution_get_params(self.girosolution_wrapper, get_params):
+        if not validate_girosolution_params(self.girosolution_wrapper, get_params):
             return HttpResponse(status=400)
 
         try:
@@ -58,13 +73,21 @@ class NotifyGirosolutionView(View):
     def dispatch(self, request, *args, **kwargs):
         return super(NotifyGirosolutionView, self).dispatch(request, *args, **kwargs)
 
-    def handle_updated_transaction(self, girosolution_transaction, expected_statuses=django_girosolution_settings.GIROSOLUTION_VALID_TRANSACTION_STATUSES):
+    def handle_updated_transaction(
+        self,
+        girosolution_transaction,
+        expected_statuses=django_girosolution_settings.GIROSOLUTION_VALID_TRANSACTION_STATUSES,
+    ):
         """
-            Override to use the girosolution_transaction in the way you want.
+        Override to use the girosolution_transaction in the way you want.
         """
         if girosolution_transaction.result_payment not in expected_statuses:
             logger.error(
-                _("Girosolution Result faulty: {}").format(RESULT_PAYMENT_STATUS[girosolution_transaction.result_payment] if girosolution_transaction.result_payment in RESULT_PAYMENT_STATUS else girosolution_transaction.result_payment)
+                _('Girosolution Result faulty: {}').format(
+                    RESULT_PAYMENT_STATUS[girosolution_transaction.result_payment]
+                    if girosolution_transaction.result_payment in RESULT_PAYMENT_STATUS
+                    else girosolution_transaction.result_payment
+                )
             )
             return HttpResponse(status=400)
         return HttpResponse(status=200)
@@ -77,14 +100,13 @@ class NotifyPaypageView(View):
     gcPaymethod and gcType in addition to the standard parameters.
     Override handle_updated_transaction() for custom logic.
     """
+
     girosolution_wrapper = GirosolutionWrapper()
 
     def get(self, request, *args, **kwargs):
-        get_params = OrderedDict()
-        for query_param in request.META['QUERY_STRING'].split('&'):
-            get_params[query_param.split('=')[0]] = "=".join(query_param.split('=')[1:])
+        get_params = parse_query_string(request.META['QUERY_STRING'])
 
-        if not validate_girosolution_get_params(self.girosolution_wrapper, get_params):
+        if not validate_girosolution_params(self.girosolution_wrapper, get_params):
             return HttpResponse(status=400)
 
         try:
@@ -102,13 +124,21 @@ class NotifyPaypageView(View):
     def dispatch(self, request, *args, **kwargs):
         return super(NotifyPaypageView, self).dispatch(request, *args, **kwargs)
 
-    def handle_updated_transaction(self, girosolution_transaction, expected_statuses=django_girosolution_settings.GIROSOLUTION_VALID_TRANSACTION_STATUSES):
+    def handle_updated_transaction(
+        self,
+        girosolution_transaction,
+        expected_statuses=django_girosolution_settings.GIROSOLUTION_VALID_TRANSACTION_STATUSES,
+    ):
         """
         Override to use the girosolution_transaction in the way you want.
         """
         if girosolution_transaction.result_payment not in expected_statuses:
             logger.error(
-                _("Girosolution Paypage Result faulty: {}").format(RESULT_PAYMENT_STATUS[girosolution_transaction.result_payment] if girosolution_transaction.result_payment in RESULT_PAYMENT_STATUS else girosolution_transaction.result_payment)
+                _('Girosolution Paypage Result faulty: {}').format(
+                    RESULT_PAYMENT_STATUS[girosolution_transaction.result_payment]
+                    if girosolution_transaction.result_payment in RESULT_PAYMENT_STATUS
+                    else girosolution_transaction.result_payment
+                )
             )
             return HttpResponse(status=400)
         return HttpResponse(status=200)
@@ -119,6 +149,7 @@ class PaypageReturnView(RedirectView):
     Handles the redirect back from GiroCheckout Payment Page.
     The paypage sends results via POST to successUrl/failUrl.
     """
+
     girosolution_wrapper = GirosolutionWrapper()
 
     def get_error_url(self):
@@ -133,12 +164,7 @@ class PaypageReturnView(RedirectView):
     def post(self, request, *args, **kwargs):
         post_params = request.POST.dict()
 
-        desired_variables = ['gcReference', 'gcMerchantTxId', 'gcBackendTxId',
-                             'gcAmount', 'gcCurrency', 'gcResultPayment', 'gcHash']
-        if not all([var in post_params for var in desired_variables]):
-            logger.error(
-                _("Not all desired variables where part of the Paypage return. Payload: {}").format(str(post_params))
-            )
+        if not validate_girosolution_params(self.girosolution_wrapper, post_params):
             return HttpResponseRedirect(self.get_error_url())
 
         try:
@@ -161,7 +187,7 @@ class PaypageReturnView(RedirectView):
 
 
 class GirosolutionReturnView(RedirectView):
-    girosolution_wrapper = wrappers
+    girosolution_wrapper = GirosolutionWrapper()
 
     def get_error_url(self):
         return django_girosolution_settings.GIROSOLUTION_ERROR_URL
@@ -173,12 +199,9 @@ class GirosolutionReturnView(RedirectView):
         return girosolution_transaction.success_url
 
     def get_redirect_url(self, *args, **kwargs):
-        # creating OrderedDict out of query string, because we need it ordered for the hash check
-        get_params = OrderedDict()
-        for query_param in self.request.META['QUERY_STRING'].split('&'):
-            get_params[query_param.split('=')[0]] = "=".join(query_param.split('=')[1:])
+        get_params = parse_query_string(self.request.META['QUERY_STRING'])
 
-        if not validate_girosolution_get_params(self.girosolution_wrapper, get_params):
+        if not validate_girosolution_params(self.girosolution_wrapper, get_params):
             return self.get_error_url()
 
         try:

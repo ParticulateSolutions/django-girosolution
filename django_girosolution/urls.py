@@ -1,6 +1,11 @@
 from django.conf.urls import url
 
-from django_girosolution.views import NotifyGirosolutionView, GirosolutionReturnView, NotifyPaypageView, PaypageReturnView
+from django_girosolution.views import (
+    NotifyGirosolutionView,
+    GirosolutionReturnView,
+    NotifyPaypageView,
+    PaypageReturnView,
+)
 
 urlpatterns = [
     url(r'^notify/$', NotifyGirosolutionView.as_view(), name='notifiy'),

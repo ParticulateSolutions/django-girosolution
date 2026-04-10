@@ -10,5 +10,4 @@ class GirosolutionTransactionAdmin(admin.ModelAdmin):
     search_fields = ('merchant_tx_id', 'reference')
 
 
-
 admin.site.register(GirosolutionTransaction, GirosolutionTransactionAdmin)
