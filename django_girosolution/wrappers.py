@@ -207,7 +207,7 @@ class GirosolutionWrapper(object):
 
         generated_hash = self._generate_hash_from_text(response_text)
         # check if hash is valid
-        assert response_hash == generated_hash, _(f'Response hash {response_hash} not compatible with the generated hash {generated_hash}.')
+        assert response_hash == generated_hash, _('Response hash {} not compatible with the generated hash {}.').format(response_hash, generated_hash)
 
         if response_dict.get('reference'):
             # generate transaction object
@@ -250,7 +250,7 @@ class GirosolutionWrapper(object):
 
         generated_hash = self._generate_hash_from_text(response_text)
         # check if hash is valid
-        assert response_hash == generated_hash, _(f'Response hash {response_hash} not compatible with the generated hash {generated_hash}.')
+        assert response_hash == generated_hash, _('Response hash {} not compatible with the generated hash {}.').format(response_hash, generated_hash)
 
         update_fields = ['latest_response_code', 'latest_response_msg']
         girosolution_transaction.latest_response_code = response_dict.get('rc')
@@ -294,11 +294,11 @@ class GirosolutionWrapper(object):
         response_hash = response.headers.get('hash')
         response_text = response.text
         generated_hash = self._generate_hash_from_text(response_text)
-        assert response_hash == generated_hash, _(f'Response hash {response_hash} not compatible with the generated hash {generated_hash}.')
+        assert response_hash == generated_hash, _('Response hash {} not compatible with the generated hash {}.').format(response_hash, generated_hash)
 
         response_dict = response.json()
         if response_dict.get('rc') != 0:
-            logger.error(_(f'Paypage projects request failed: {response_dict.get("msg")}'))
+            logger.error(_('Paypage projects request failed: {}').format(response_dict.get('msg')))
             return None
 
         projects = response_dict.get('projects', [])
@@ -490,7 +490,7 @@ class GirosolutionWrapper(object):
         response_text = response.text
 
         generated_hash = self._generate_hash_from_text(response_text)
-        assert response_hash == generated_hash, _(f'Response hash {response_hash} not compatible with the generated hash {generated_hash}.')
+        assert response_hash == generated_hash, _('Response hash {} not compatible with the generated hash {}.').format(response_hash, generated_hash)
 
         if response_dict.get('reference'):
             from django_girosolution.models import GirosolutionTransaction

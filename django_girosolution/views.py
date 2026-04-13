@@ -39,7 +39,7 @@ def validate_girosolution_params(girosolution_wrapper: GirosolutionWrapper, para
 
     # check for expected parameters
     if not all([var in params for var in desired_variables]):
-        logger.error(_(f'Not all desired variables were part of the GiroSolution Notification. Payload: {params}'))
+        logger.error(_('Not all desired variables were part of the GiroSolution Notification. Payload: {}').format(params))
         return False
 
     if not girosolution_wrapper.validate_hash(params, params['gcHash']):
